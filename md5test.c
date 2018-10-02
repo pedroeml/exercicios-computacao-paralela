@@ -1,4 +1,8 @@
-// How to compile: gcc -o md5test md5test.c -lcrypto -lssl -std=c99
+/*** 
+ * How to compile: 
+ * GCC 4.6.3: gcc -o md5test md5test.c -lcrypto -lssl -std=c99
+ * GCC 6.3.0: gcc -o md5test md5test.c -lcrypto -lssl
+ **/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,19 +52,7 @@ void md5_print(unsigned char* result) {
     for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
         printf("%02x", *(result + i));
     }
-}
-
-char* md5_result_to_str(unsigned char* result) {
-    char* result_str = (char*) malloc(2*MD5_DIGEST_LENGTH*sizeof(char));
-    char* ptr = result_str;
-    
-    printf("STR: ");
-    for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
-        sprintf(ptr, "%02x", *(result + i));
-        ptr += 2;
-    }
-
-    return result_str;
+    printf("\n");
 }
 
 unsigned char* str_to_md5(char* str) {
@@ -68,17 +60,10 @@ unsigned char* str_to_md5(char* str) {
     
     MD5(str, strlen(str), result);
 
-    printf("MD5: ");
-    md5_print(result);
-    printf("\n");
-
-    char* result_str = md5_result_to_str(result);
-    printf("%s\n\n", result_str);
-
     return result;
 }
 
-char** str_split(char* a_str, const char a_delim) {
+char** str_split(char* a_str, const char a_delim, size_t* len) {
     // https://stackoverflow.com/questions/9210528/split-string-with-delimiters-in-c
     char** result    = 0;
     size_t count     = 0;
@@ -107,23 +92,50 @@ char** str_split(char* a_str, const char a_delim) {
     result = malloc(sizeof(char*) * count);
 
     if (result) {
-        size_t idx  = 0;
+        size_t idx = 0;
+        *len = 0;
         char* token = strtok(a_str, delim);
 
         while (token) {
             assert(idx < count);
             *(result + idx++) = strdup(token);
+            if (strlen(token) > 1)
+                (*len)++;
             token = strtok(0, delim);
         }
-        assert(idx == count - 1);
         *(result + idx) = 0;
     }
 
     return result;
 }
 
+typedef struct Line1 {
+    char* str;
+    unsigned char* md5;
+} Line;
+
+typedef struct Book1 {
+    int number;
+    size_t lines_len;
+    Line* lines;
+} Book;
+
+void books_print(Book* books) {
+    for (int i = 0; i < NUMBER_OF_BOOKS; i++) {
+        for (int j = 0; j < books[i].lines_len; j++) {
+            Line* line = &(books[i].lines[j]);
+            printf("%d: %d/%d %s\n", books[i].number, j, books[i].lines_len, line->str);
+            md5_print(line->md5);
+        }
+    }
+}
+
 int main() {
+    Book books[NUMBER_OF_BOOKS];
+
     for (int i = 1; i <= NUMBER_OF_BOOKS; i++) {
+        books[i-1].number = i;
+
         char* filepath = (char*) malloc(25*sizeof(char));
         char* filename = (char*) malloc(8*sizeof(char));
         
@@ -135,22 +147,27 @@ int main() {
         free(filename);
 
         char** tokens;
-        tokens = str_split(str, '\n');
+        size_t len;
+        tokens = str_split(str, '\n', &len);
         free(str);
 
+        books[i-1].lines_len = len;
+        books[i-1].lines = (Line*) malloc(len*sizeof(Line));
+
         if (tokens) {
+            int count = 0;
             for (int j = 0; *(tokens + j); j++) {
                 if (strlen(*(tokens + j)) > 1) {
-                    printf("Line %d: %s\n", j, *(tokens + j));
-                    // unsigned char* md5_result = str_to_md5(*(tokens + j));
-                    // TODO: md5_result needs to be free later
-                    free(*(tokens + j));
+                    unsigned char* md5 = str_to_md5(*(tokens + j));
+                    Line* line = &(books[i-1].lines[count++]);
+                    line->str = *(tokens + j);
+                    line->md5 = md5;
                 }
             }
-            printf("\n");
-            // free(tokens);
         }
     }
+
+    books_print(&books);
 
     return EXIT_SUCCESS;
 }
