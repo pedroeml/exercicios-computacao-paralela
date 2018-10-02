@@ -1,16 +1,29 @@
 /*** 
  * How to compile: 
- * GCC 4.6.3: gcc -o md5test md5test.c -lcrypto -lssl -std=c99
- * GCC 6.3.0: gcc -o md5test md5test.c -lcrypto -lssl
+ * GCC 4.6.3: gcc -fopenmp -o md5test md5test.c -lcrypto -lssl -std=c99
+ * GCC 6.3.0: gcc -fopenmp -o md5test md5test.c -lcrypto -lssl
  **/
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <assert.h>
 #include <openssl/md5.h>
+#include <omp.h>
 
 #define NUMBER_OF_BOOKS 30
+
+typedef struct Line1 {
+    char* str;
+    unsigned char* md5;
+} Line;
+
+typedef struct Book1 {
+    int number;
+    size_t lines_len;
+    Line* lines;
+} Book;
 
 char* file_to_str(char* filepath, char* filename) {
     // https://stackoverflow.com/questions/3747086/reading-the-whole-text-file-into-a-char-array-in-c
@@ -49,9 +62,9 @@ char* file_to_str(char* filepath, char* filename) {
 }
 
 void md5_print(unsigned char* result) {
-    for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
+    for (int i = 0; i < MD5_DIGEST_LENGTH; i++)
         printf("%02x", *(result + i));
-    }
+    
     printf("\n");
 }
 
@@ -97,7 +110,6 @@ char** str_split(char* a_str, const char a_delim, size_t* len) {
         char* token = strtok(a_str, delim);
 
         while (token) {
-            assert(idx < count);
             *(result + idx++) = strdup(token);
             if (strlen(token) > 1)
                 (*len)++;
@@ -109,16 +121,17 @@ char** str_split(char* a_str, const char a_delim, size_t* len) {
     return result;
 }
 
-typedef struct Line1 {
-    char* str;
-    unsigned char* md5;
-} Line;
-
-typedef struct Book1 {
-    int number;
-    size_t lines_len;
-    Line* lines;
-} Book;
+char* load_book_i(int i) {
+    char filepath[25];
+    char filename[8];
+        
+    sprintf(filepath, "plain_text_books/%d.txt", i);
+    sprintf(filename, "%d.txt", i);
+    
+    char* whole_text = file_to_str(filepath, filename);
+    
+    return whole_text;
+}
 
 void books_print(Book* books) {
     for (int i = 0; i < NUMBER_OF_BOOKS; i++) {
@@ -130,44 +143,58 @@ void books_print(Book* books) {
     }
 }
 
-int main() {
+bool md5_equals(unsigned char* md5_a, unsigned char* md5_b) {
+    for (int i = 0; i < MD5_DIGEST_LENGTH; i++)
+        if (*(md5_a + i) != *(md5_b + i))
+            return false;
+    
+    return true;
+}
+
+int main(int argc, const char** argv) {
+    if (argc < 2) {
+        printf("Usage ./%s <number_of_threads>\n", argv[0]);
+        exit(0);
+    }
+
+	printf("Number of processors: %d\n", omp_get_num_procs());
+
+    const int NUM_THREADS = atoi(argv[1]);
+    omp_set_num_threads(NUM_THREADS);
+
+    double starttime, stoptime;
+    starttime = omp_get_wtime();
+
     Book books[NUMBER_OF_BOOKS];
 
+    #pragma omp parallel for schedule (dynamic)
     for (int i = 1; i <= NUMBER_OF_BOOKS; i++) {
         books[i-1].number = i;
 
-        char* filepath = (char*) malloc(25*sizeof(char));
-        char* filename = (char*) malloc(8*sizeof(char));
-        
-        sprintf(filepath, "plain_text_books/%d.txt", i);
-        sprintf(filename, "%d.txt", i);
-        
-        char* str = file_to_str(filepath, filename);
-        free(filepath);
-        free(filename);
-
-        char** tokens;
+        char* whole_text = load_book_i(i);
         size_t len;
-        tokens = str_split(str, '\n', &len);
-        free(str);
+        char** lines = str_split(whole_text, '\n', &len);
+        free(whole_text);
 
         books[i-1].lines_len = len;
         books[i-1].lines = (Line*) malloc(len*sizeof(Line));
 
-        if (tokens) {
+        if (lines) {
             int count = 0;
-            for (int j = 0; *(tokens + j); j++) {
-                if (strlen(*(tokens + j)) > 1) {
-                    unsigned char* md5 = str_to_md5(*(tokens + j));
+            for (int j = 0; *(lines + j); j++) {
+                if (strlen(*(lines + j)) > 1) {
                     Line* line = &(books[i-1].lines[count++]);
-                    line->str = *(tokens + j);
-                    line->md5 = md5;
+                    line->str = *(lines + j);
+                    line->md5 = str_to_md5(*(lines + j));
                 }
             }
         }
     }
+    
+    // books_print(&books);
 
-    books_print(&books);
+    stoptime = omp_get_wtime();
+    printf("Execution time: %3.2f s\n", stoptime-starttime);
 
     return EXIT_SUCCESS;
 }
