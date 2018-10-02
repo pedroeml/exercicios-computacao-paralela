@@ -151,6 +151,37 @@ bool md5_equals(unsigned char* md5_a, unsigned char* md5_b) {
     return true;
 }
 
+int find_line_in_books(Book* books, char* line_str) {
+    unsigned char* md5 = str_to_md5(line_str);
+    int book_number = 0;
+    #pragma omp parallel shared(md5, book_number)
+    #pragma omp for schedule (dynamic)
+    for (int i = 0; i < NUMBER_OF_BOOKS; i++) {
+        for (int j = 0; j < books[i].lines_len; j++) {
+            Line* line = &(books[i].lines[j]);
+            if (book_number != 0) {
+                break;
+            } else if (md5_equals(md5, line->md5)) {
+                #pragma omp atomic
+                book_number += books[i].number;   
+            }
+        }
+    }
+
+    return book_number;
+}
+
+void find_all_lines_in_books(Book* books) {
+    for (int i = 0; i < NUMBER_OF_BOOKS; i++) {
+        printf("find_all_lines_in_books %d\n", i);
+        for (int j = 0; j < books[i].lines_len; j++) {
+            Line* line = &(books[i].lines[j]);
+            char* line_str = line->str;
+            int book_number = find_line_in_books(books, line_str);
+        }
+    }
+}
+
 int main(int argc, const char** argv) {
     if (argc < 2) {
         printf("Usage ./%s <number_of_threads>\n", argv[0]);
@@ -161,9 +192,6 @@ int main(int argc, const char** argv) {
 
     const int NUM_THREADS = atoi(argv[1]);
     omp_set_num_threads(NUM_THREADS);
-
-    double starttime, stoptime;
-    starttime = omp_get_wtime();
 
     Book books[NUMBER_OF_BOOKS];
 
@@ -192,6 +220,11 @@ int main(int argc, const char** argv) {
     }
     
     // books_print(&books);
+
+    double starttime, stoptime;
+    starttime = omp_get_wtime();
+
+    find_all_lines_in_books(&books);
 
     stoptime = omp_get_wtime();
     printf("Execution time: %3.2f s\n", stoptime-starttime);
