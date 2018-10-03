@@ -137,7 +137,7 @@ void books_print(Book* books) {
     for (int i = 0; i < NUMBER_OF_BOOKS; i++) {
         for (int j = 0; j < books[i].lines_len; j++) {
             Line* line = &(books[i].lines[j]);
-            printf("%d: %d/%d %s\n", books[i].number, j, books[i].lines_len, line->str);
+            printf("Book %d; line %d of %lu: %s\n", books[i].number, j, books[i].lines_len, line->str);
             md5_print(line->md5);
         }
     }
@@ -173,18 +173,20 @@ int find_line_in_books(Book* books, char* line_str) {
 
 void find_all_lines_in_books(Book* books) {
     for (int i = 0; i < NUMBER_OF_BOOKS; i++) {
-        printf("find_all_lines_in_books %d\n", i);
+        printf("\rBook %d of %d", i+1, NUMBER_OF_BOOKS);
+        fflush(stdout);
         for (int j = 0; j < books[i].lines_len; j++) {
             Line* line = &(books[i].lines[j]);
             char* line_str = line->str;
             int book_number = find_line_in_books(books, line_str);
         }
     }
+    printf("\n");
 }
 
 int main(int argc, const char** argv) {
     if (argc < 2) {
-        printf("Usage ./%s <number_of_threads>\n", argv[0]);
+        printf("Usage %s <number_of_threads>\n", argv[0]);
         exit(0);
     }
 
@@ -192,6 +194,8 @@ int main(int argc, const char** argv) {
 
     const int NUM_THREADS = atoi(argv[1]);
     omp_set_num_threads(NUM_THREADS);
+
+    printf("Number of threads: %d\n", NUM_THREADS);
 
     Book books[NUMBER_OF_BOOKS];
 
@@ -219,7 +223,7 @@ int main(int argc, const char** argv) {
         }
     }
     
-    // books_print(&books);
+    books_print(&books);
 
     double starttime, stoptime;
     starttime = omp_get_wtime();
