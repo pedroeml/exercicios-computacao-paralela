@@ -1,7 +1,6 @@
 /*** 
  * How to compile: 
- * GCC 4.6.3: gcc -fopenmp -o md5test md5test.c -lcrypto -lssl -std=c99
- * GCC 6.3.0: gcc -fopenmp -o md5test md5test.c -lcrypto -lssl
+ * GCC 6.3.0 to 7.3.0: gcc -fopenmp -o md5test md5test.c -lcrypto -lssl
  **/
 
 #include <stdio.h>
@@ -135,9 +134,10 @@ char* load_book_i(int i) {
 
 void books_print(Book* books) {
     for (int i = 0; i < NUMBER_OF_BOOKS; i++) {
+        printf("Book %d; total lines %lu\n", books[i].number, books[i].lines_len);
         for (int j = 0; j < books[i].lines_len; j++) {
             Line* line = &(books[i].lines[j]);
-            printf("Book %d; line %d of %lu: %s\n", books[i].number, j, books[i].lines_len, line->str);
+            printf("Book %d; line %d of %lu: %s\n", books[i].number, j+1, books[i].lines_len, line->str);
             md5_print(line->md5);
         }
     }
@@ -154,6 +154,7 @@ bool md5_equals(unsigned char* md5_a, unsigned char* md5_b) {
 int find_line_in_books(Book* books, char* line_str) {
     unsigned char* md5 = str_to_md5(line_str);
     int book_number = 0;
+    
     #pragma omp parallel shared(md5, book_number)
     #pragma omp for schedule (dynamic)
     for (int i = 0; i < NUMBER_OF_BOOKS; i++) {
@@ -167,6 +168,8 @@ int find_line_in_books(Book* books, char* line_str) {
             }
         }
     }
+    
+    free(md5);
 
     return book_number;
 }
@@ -184,6 +187,20 @@ void find_all_lines_in_books(Book* books) {
     printf("\n");
 }
 
+void free_books(Book* books) {
+    for (int i = 0; i < NUMBER_OF_BOOKS; i++) {
+        for (int j = 0; j < books[i].lines_len; j++) {
+            Line* line = &(books[i].lines[j]);
+            char* line_str = line->str;
+            unsigned char* md5 = line->md5;
+            free(md5);
+            free(line_str);
+        }
+        Line* lines = &(books[i].lines);
+        // free(lines); // TODO: Freeing all lines structs not working
+    }
+}
+
 int main(int argc, const char** argv) {
     if (argc < 2) {
         printf("Usage %s <number_of_threads>\n", argv[0]);
@@ -199,7 +216,6 @@ int main(int argc, const char** argv) {
 
     Book books[NUMBER_OF_BOOKS];
 
-    #pragma omp parallel for schedule (dynamic)
     for (int i = 1; i <= NUMBER_OF_BOOKS; i++) {
         books[i-1].number = i;
 
@@ -232,6 +248,8 @@ int main(int argc, const char** argv) {
 
     stoptime = omp_get_wtime();
     printf("Execution time: %3.2f s\n", stoptime-starttime);
+
+    free_books(&books);
 
     return EXIT_SUCCESS;
 }
