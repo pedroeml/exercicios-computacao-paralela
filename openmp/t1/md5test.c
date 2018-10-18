@@ -1,6 +1,7 @@
 /*** 
  * How to compile: 
- * GCC 6.3.0 to 7.3.0: gcc -fopenmp -o md5test md5test.c -lcrypto -lssl
+ * GCC 4.6.3: gcc -fopenmp -o md5test md5test.c -lcrypto -lssl -std=c99
+ * GCC 6.3.0: gcc -fopenmp -o md5test md5test.c -lcrypto -lssl
  **/
 
 #include <stdio.h>
