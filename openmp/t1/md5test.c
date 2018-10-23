@@ -202,6 +202,25 @@ void free_books(Book* books) {
     }
 }
 
+void update_book(Book* book, char* whole_text) {
+    size_t len;
+    char** lines = str_split(whole_text, '\n', &len);
+    book->lines_len = len;
+    book->lines = (Line*) malloc(len*sizeof(Line));
+    
+    if (lines) {
+        int count = 0;
+        int j;
+        for (j = 0; *(lines + j); j++) {
+            if (strlen(*(lines + j)) > 1) {
+                Line* line = &(book->lines[count++]);
+                line->str = *(lines + j);
+                line->md5 = str_to_md5(*(lines + j));
+            }
+        }
+    }
+}
+
 int main(int argc, const char** argv) {
     if (argc < 2) {
         printf("Usage %s <number_of_threads>\n", argv[0]);
@@ -221,23 +240,10 @@ int main(int argc, const char** argv) {
         books[i-1].number = i;
 
         char* whole_text = load_book_i(i);
-        size_t len;
-        char** lines = str_split(whole_text, '\n', &len);
+
+        update_book(&(books[i-1]), whole_text);
+
         free(whole_text);
-
-        books[i-1].lines_len = len;
-        books[i-1].lines = (Line*) malloc(len*sizeof(Line));
-
-        if (lines) {
-            int count = 0;
-            for (int j = 0; *(lines + j); j++) {
-                if (strlen(*(lines + j)) > 1) {
-                    Line* line = &(books[i-1].lines[count++]);
-                    line->str = *(lines + j);
-                    line->md5 = str_to_md5(*(lines + j));
-                }
-            }
-        }
     }
     
     books_print(&books);
