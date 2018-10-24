@@ -9,7 +9,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <assert.h>
-#include <time.h>
 #include <openssl/md5.h>
 #include <mpi.h>
 
@@ -292,11 +291,11 @@ int main(int argc, char** argv) {
 
         // books_print(&books);
         
-        clock_t starttime = clock();
+        double starttime = MPI_Wtime();
         find_all_lines_in_books(&books);
-        clock_t stoptime = clock();
-        double executiontime = (double) (stoptime - starttime)/CLOCKS_PER_SEC;
-        printf("Execution time: %3.2f s\n", executiontime);
+        double stoptime = MPI_Wtime();
+        double executiontime = stoptime - starttime;
+        printf("Execution time: %.2f s\n", executiontime);
 
         free_books(&books);
     } else {    // papel do escravo
