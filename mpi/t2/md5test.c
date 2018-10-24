@@ -184,7 +184,7 @@ int find_line_in_books(Book* books, char* line_str) {
     for (i = 1; i <= NUMBER_OF_BOOKS; i++) {
         unsigned short found = 0;
         MPI_Recv(&found, 1, MPI_UNSIGNED_SHORT, i, 1, MPI_COMM_WORLD, &status);
-        book_number = found != 0? i : 0;
+        book_number = found != 0 ? i : 0;
         // printf("\nEscravo[%d]: %s", i, found != 0 ? "encontrou" : "não encontrou");
     }
 
@@ -290,7 +290,7 @@ int main(int argc, char** argv) {
         }
 
         // books_print(&books);
-        
+
         double starttime = MPI_Wtime();
         find_all_lines_in_books(&books);
         double stoptime = MPI_Wtime();
@@ -301,7 +301,7 @@ int main(int argc, char** argv) {
     } else {    // papel do escravo
         size_t len;
         MPI_Recv(&len, 1, MPI_UNSIGNED_LONG, 0, 1, MPI_COMM_WORLD, &status);
-        
+
         char* whole_text = (char*) malloc((1+len)*sizeof(char));
         *(whole_text + len) = '\0';
         MPI_Recv(whole_text, len, MPI_CHAR, 0, 1, MPI_COMM_WORLD, &status);
