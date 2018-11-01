@@ -10,7 +10,7 @@
 
 #define DEBUG 1            // comentar esta linha quando for medir tempo
 #define ARRAY_SIZE 40      // trabalho final com o valores 10.000, 100.000, 1.000.000
-#define DELTA 10
+int delta;
 
 void print_array(int* array, int len) {
     printf("[");
@@ -65,14 +65,14 @@ int *interleaving(int vetor[], int tam) {
 int calc_next_target(int my_rank, int tree_level) {
     int target = round(pow(2.0, tree_level) + my_rank);
 
-    printf("[%d] Next target: %d\n", my_rank, target);
+    printf("[%d] Next target: 2^%d+%d = %d\n", my_rank, tree_level, my_rank, target);
     
     return target;
 }
 
 void divide_if_needed(int* array, int len, int target, int my_rank, int tree_level) {
     int half_len = len/2;
-    int* half_array = &(array[half_len - 1]);   // The second half of array
+    int* half_array = &(array[half_len]);   // The second half of array
     
     #ifdef DEBUG
     printf("[%d] array of len %d\n", my_rank, len);
@@ -81,19 +81,23 @@ void divide_if_needed(int* array, int len, int target, int my_rank, int tree_lev
     print_array(half_array, half_len);
     #endif
 
+    printf("[%d] Sending data to %d\n", my_rank, target);
+
+    int new_tree_level = tree_level + 1;
     MPI_Send(&my_rank, 1, MPI_INT, target, 1, MPI_COMM_WORLD);
-    MPI_Send(&tree_level, 1, MPI_INT, target, 1, MPI_COMM_WORLD);
+    MPI_Send(&new_tree_level, 1, MPI_INT, target, 1, MPI_COMM_WORLD);
     MPI_Send(&half_len, 1, MPI_INT, target, 1, MPI_COMM_WORLD);
     MPI_Send(half_array, half_len, MPI_INT, target, 1, MPI_COMM_WORLD);
 
-    if (half_len > DELTA) {
-        divide_if_needed(half_array, half_len, calc_next_target(my_rank, tree_level+1), my_rank, tree_level+1);
+    if (half_len > delta) {
+        printf("[%d] %d > %d\n", my_rank, half_len, delta);
+        divide_if_needed(array, half_len, calc_next_target(my_rank, new_tree_level), my_rank, new_tree_level);
     } else {
-        bs(half_len, half_array);
+        bs(half_len, array);
 
         #ifdef DEBUG
         printf("[%d] sorted half_array of len %d\n", my_rank, half_len);
-        print_array(half_array, half_len);
+        print_array(array, half_len);
         #endif
 
         // TODO: send to father node using interleaving function maybe?
@@ -109,8 +113,10 @@ int main(int argc, char** argv) {
 
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);    // pega o numero do processo atual (rank)
     MPI_Comm_size(MPI_COMM_WORLD, &proc_n);     // pega informação do numero de processos (quantidade total)
+    delta = ARRAY_SIZE/proc_n;
     
     if (my_rank == 0) {
+        printf("DELTA = %d\n", delta);
         int vetor[ARRAY_SIZE];
         int i;
 
@@ -118,7 +124,7 @@ int main(int argc, char** argv) {
             vetor[i] = ARRAY_SIZE-i;
         
         #ifdef DEBUG
-        printf("\nVetor: ");
+        printf("[0] Vetor: ");
         print_array(&vetor, ARRAY_SIZE);
         #endif
         int tree_level = 0;
@@ -127,20 +133,28 @@ int main(int argc, char** argv) {
         int i;
         int father;
         printf("[%d] Waiting for father node...\n", my_rank);
-        for (i = 0; i < my_rank; i++) {
-            MPI_Recv(&father, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        }
+        // for (i = 0; i < my_rank; i++) {
+        MPI_Recv(&father, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        father = status.MPI_SOURCE;
+        // }
+
         printf("[%d] Father is %d\n", my_rank, father);
 
         int tree_level;
         MPI_Recv(&tree_level, 1, MPI_INT, father, 1, MPI_COMM_WORLD, &status);
-
+        printf("[%d] Received tree_level %d\n", my_rank, tree_level);
         int len;
         MPI_Recv(&len, 1, MPI_INT, father, 1, MPI_COMM_WORLD, &status);
+        printf("[%d] Received len %d\n", my_rank, len);
         int half_array[len];
         MPI_Recv(&half_array, len, MPI_INT, father, 1, MPI_COMM_WORLD, &status);
+        printf("[%d] Received half_array\n", my_rank);
+        #ifdef DEBUG
+        printf("[%d] Vetor: ", my_rank);
+        print_array(&half_array, len);
+        #endif
         
-        divide_if_needed(&half_array, len, calc_next_target(my_rank, tree_level+1), my_rank, tree_level);
+        divide_if_needed(&half_array, len, calc_next_target(my_rank, tree_level), my_rank, tree_level);
     }
     
     MPI_Finalize();
