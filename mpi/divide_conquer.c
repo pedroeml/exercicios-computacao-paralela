@@ -113,6 +113,40 @@ void divide_if_needed(int* array, int len, int target, int my_rank, int father, 
     }
 }
 
+void divide(int* array, int len, int targetA, int targetB, int my_rank, int father, int tree_level) {
+    if (len > delta) {
+        int half_len = len/2;
+        int* half_array = &(array[half_len]);   // The second half of array
+        
+        print_array(array, half_len);
+        print_array(half_array, half_len);
+        
+        int new_tree_level = tree_level + 1;
+        
+        MPI_Send(&my_rank, 1, MPI_INT, targetA, 1, MPI_COMM_WORLD);
+        MPI_Send(&new_tree_level, 1, MPI_INT, targetA, 1, MPI_COMM_WORLD);
+        MPI_Send(&half_len, 1, MPI_INT, targetA, 1, MPI_COMM_WORLD);
+        MPI_Send(array, half_len, MPI_INT, targetA, 1, MPI_COMM_WORLD);
+        
+        MPI_Send(&my_rank, 1, MPI_INT, targetB, 1, MPI_COMM_WORLD);
+        MPI_Send(&new_tree_level, 1, MPI_INT, targetB, 1, MPI_COMM_WORLD);
+        MPI_Send(&half_len, 1, MPI_INT, targetB, 1, MPI_COMM_WORLD);
+        MPI_Send(half_array, half_len, MPI_INT, targetB, 1, MPI_COMM_WORLD);
+
+        MPI_Recv(array, half_len, MPI_INT, targetA, 1, MPI_COMM_WORLD, &status);
+        MPI_Recv(half_array, half_len, MPI_INT, targetB, 1, MPI_COMM_WORLD, &status);
+
+        sort(array, len, my_rank);
+
+        MPI_Send(array, len, MPI_INT, father, 1, MPI_COMM_WORLD);
+    } else {
+        sort(array, len, my_rank);
+
+        MPI_Send(half_array, half_len, MPI_INT, father, 1, MPI_COMM_WORLD);
+    }
+}
+
+
 int main(int argc, char** argv) {
     int my_rank;    // Identificador deste processo
     int proc_n;     // Numero de processos disparados pelo usuário na linha de comando (np)
@@ -132,6 +166,9 @@ int main(int argc, char** argv) {
             vetor[i] = ARRAY_SIZE-i;
         
         int tree_level = 0;
+        
+        // TODO: selector mechanism to select which version to use
+
         divide_if_needed(&vetor, ARRAY_SIZE, calc_next_target(my_rank, tree_level), my_rank, -1, tree_level);
     } else {
         int father;
@@ -143,6 +180,8 @@ int main(int argc, char** argv) {
         MPI_Recv(&len, 1, MPI_INT, father, 1, MPI_COMM_WORLD, &status);
         int half_array[len];
         MPI_Recv(&half_array, len, MPI_INT, father, 1, MPI_COMM_WORLD, &status);
+        
+        // TODO: selector mechanism to select which version to use
         
         divide_if_needed(&half_array, len, calc_next_target(my_rank, tree_level), my_rank, father, tree_level);
     }
