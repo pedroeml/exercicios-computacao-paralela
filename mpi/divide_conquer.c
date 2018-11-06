@@ -10,7 +10,7 @@
 #include <mpi.h>
 
 #define LOAD_BALANCE 0
-#define ARRAY_SIZE 100000      // trabalho final com o valores 10.000, 100.000, 1.000.000
+#define ARRAY_SIZE 500000
 int delta;
 MPI_Status status;  // Status de retorno
 
