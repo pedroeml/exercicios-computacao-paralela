@@ -134,11 +134,12 @@ void divide(int* array, int len, int targetA, int targetB, int my_rank, int fath
 
         printf("\rTree level %d", tree_level);
         fflush(stdout);
-
-        MPI_Send(array, len, MPI_INT, father, 1, MPI_COMM_WORLD);
+        
+        if (my_rank != father) {
+            MPI_Send(array, len, MPI_INT, father, 1, MPI_COMM_WORLD);
+        }
     } else {
         sort(array, len, my_rank);
-
         MPI_Send(array, len, MPI_INT, father, 1, MPI_COMM_WORLD);
     }
 }
@@ -175,7 +176,7 @@ int main(int argc, char** argv) {
 
         double stoptime = MPI_Wtime();
         double executiontime = stoptime - starttime;
-        printf("Execution time: %.2f s\n", executiontime);
+        printf("\nExecution time: %.2f s\n", executiontime);
     } else {
         int father;
         MPI_Recv(&father, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
