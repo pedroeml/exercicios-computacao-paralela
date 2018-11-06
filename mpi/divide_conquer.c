@@ -1,6 +1,7 @@
 /***
  * How to compile: mpicc divide_conquer.c -o divide_conquer -lm
- * How to run: mpirun -np <NUMBER-OF-PROCESSES-POWER-OF-2> divide_conquer
+ * How to run: mpirun -np <NUMBER-OF-PROCESSES> divide_conquer
+ * The number of nodes must be 2^n (a power of 2) if LOAD_BALANCE is 1, otherwise it must be 2^n - 1
  **/
 
 #include <stdio.h>
@@ -8,8 +9,8 @@
 #include <math.h>
 #include <mpi.h>
 
-#define DEBUG 1            // comentar esta linha quando for medir tempo
-#define ARRAY_SIZE 80      // trabalho final com o valores 10.000, 100.000, 1.000.000
+#define LOAD_BALANCE 0
+#define ARRAY_SIZE 100000      // trabalho final com o valores 10.000, 100.000, 1.000.000
 int delta;
 MPI_Status status;  // Status de retorno
 
@@ -48,13 +49,11 @@ int calc_father(int my_rank, int tree_level) {
 
 void sort(int* array, int len, int my_rank) {
     bs(len, array);
-
-    printf("[%d] sorted array of len %d\n", my_rank, len);
-    print_array(array, len);
 }
 
-
 void recursive_join(int* array, int len, int my_rank, int father, int tree_level) {
+    printf("\rTree level %d", tree_level);
+    fflush(stdout);
     if (tree_level > 0) {
         if (father > -1 && father != my_rank) {
             MPI_Send(&len, 1, MPI_INT, father, 1, MPI_COMM_WORLD);
@@ -89,11 +88,11 @@ void recursive_join(int* array, int len, int my_rank, int father, int tree_level
 
 
 void divide_if_needed(int* array, int len, int target, int my_rank, int father, int tree_level) {
+    printf("\rTree level %d", tree_level);
+    fflush(stdout);
     if (len > delta) {
         int half_len = len/2;
         int* half_array = &(array[half_len]);   // The second half of array
-        
-        print_array(half_array, half_len);
         
         int new_tree_level = tree_level + 1;
         MPI_Send(&my_rank, 1, MPI_INT, target, 1, MPI_COMM_WORLD);
@@ -114,12 +113,11 @@ void divide_if_needed(int* array, int len, int target, int my_rank, int father, 
 }
 
 void divide(int* array, int len, int targetA, int targetB, int my_rank, int father, int tree_level) {
+    printf("\rTree level %d", tree_level);
+    fflush(stdout);
     if (len > delta) {
         int half_len = len/2;
         int* half_array = &(array[half_len]);   // The second half of array
-        
-        print_array(array, half_len);
-        print_array(half_array, half_len);
         
         int new_tree_level = tree_level + 1;
         
@@ -142,10 +140,9 @@ void divide(int* array, int len, int targetA, int targetB, int my_rank, int fath
     } else {
         sort(array, len, my_rank);
 
-        MPI_Send(half_array, half_len, MPI_INT, father, 1, MPI_COMM_WORLD);
+        MPI_Send(array, len, MPI_INT, father, 1, MPI_COMM_WORLD);
     }
 }
-
 
 int main(int argc, char** argv) {
     int my_rank;    // Identificador deste processo
@@ -155,7 +152,7 @@ int main(int argc, char** argv) {
 
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);    // pega o numero do processo atual (rank)
     MPI_Comm_size(MPI_COMM_WORLD, &proc_n);     // pega informação do numero de processos (quantidade total)
-    delta = ARRAY_SIZE/proc_n;
+    delta = LOAD_BALANCE == 1 ? ARRAY_SIZE/proc_n : ARRAY_SIZE/((proc_n+1)/2);
     
     if (my_rank == 0) {
         printf("DELTA = %d\n", delta);
@@ -166,10 +163,20 @@ int main(int argc, char** argv) {
             vetor[i] = ARRAY_SIZE-i;
         
         int tree_level = 0;
-        
-        // TODO: selector mechanism to select which version to use
 
-        divide_if_needed(&vetor, ARRAY_SIZE, calc_next_target(my_rank, tree_level), my_rank, -1, tree_level);
+        double starttime = MPI_Wtime();
+
+        if (LOAD_BALANCE == 1) {
+            divide_if_needed(&vetor, ARRAY_SIZE, calc_next_target(my_rank, tree_level), my_rank, -1, tree_level);
+        } else {
+            int targetA = 2*my_rank + 1;
+            int targetB = targetA + 1;
+            divide(&vetor, ARRAY_SIZE, targetA, targetB, my_rank, my_rank, tree_level);
+        }
+
+        double stoptime = MPI_Wtime();
+        double executiontime = stoptime - starttime;
+        printf("Execution time: %.2f s\n", executiontime);
     } else {
         int father;
         MPI_Recv(&father, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -181,9 +188,13 @@ int main(int argc, char** argv) {
         int half_array[len];
         MPI_Recv(&half_array, len, MPI_INT, father, 1, MPI_COMM_WORLD, &status);
         
-        // TODO: selector mechanism to select which version to use
-        
-        divide_if_needed(&half_array, len, calc_next_target(my_rank, tree_level), my_rank, father, tree_level);
+        if (LOAD_BALANCE == 1) {
+            divide_if_needed(&half_array, len, calc_next_target(my_rank, tree_level), my_rank, father, tree_level);
+        } else {
+            int targetA = 2*my_rank + 1;
+            int targetB = targetA + 1;
+            divide(&half_array, len, targetA, targetB, my_rank, father, tree_level);
+        }
     }
     
     MPI_Finalize();
