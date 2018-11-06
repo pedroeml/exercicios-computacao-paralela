@@ -70,13 +70,11 @@ void recursive_join(int* array, int len, int my_rank, int father, int tree_level
             int new_array[len+half_len];
             int i;
             for (i = 0; i < len; i++) {
-                new_array[i] = *(array + i);
+                new_array[i] = half_array[i];
             }
             for (i = len; i < len+half_len; i++) {
-                new_array[i] = half_array[i - len];
+                new_array[i] = *(array + i - len);
             }
-
-            sort(new_array, len+half_len, my_rank);
 
             if (new_tree_level > 0) {
                 int new_father = calc_father(my_rank, new_tree_level-1);
@@ -131,10 +129,11 @@ void divide(int* array, int len, int targetA, int targetB, int my_rank, int fath
         MPI_Send(&half_len, 1, MPI_INT, targetB, 1, MPI_COMM_WORLD);
         MPI_Send(half_array, half_len, MPI_INT, targetB, 1, MPI_COMM_WORLD);
 
-        MPI_Recv(array, half_len, MPI_INT, targetA, 1, MPI_COMM_WORLD, &status);
-        MPI_Recv(half_array, half_len, MPI_INT, targetB, 1, MPI_COMM_WORLD, &status);
+        MPI_Recv(array, half_len, MPI_INT, targetB, 1, MPI_COMM_WORLD, &status);
+        MPI_Recv(half_array, half_len, MPI_INT, targetA, 1, MPI_COMM_WORLD, &status);
 
-        sort(array, len, my_rank);
+        printf("\rTree level %d", tree_level);
+        fflush(stdout);
 
         MPI_Send(array, len, MPI_INT, father, 1, MPI_COMM_WORLD);
     } else {
