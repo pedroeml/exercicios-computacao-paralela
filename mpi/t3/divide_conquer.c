@@ -1,7 +1,7 @@
 /***
  * How to compile: mpicc divide_conquer.c -o divide_conquer -lm
  * How to run: mpirun -np <NUMBER-OF-PROCESSES> divide_conquer
- * The number of nodes must be 2^n (a power of 2) if LOAD_BALANCE is 1, otherwise it must be 2^n - 1
+ * The number of processes must be 2^n (a power of 2) if LOAD_BALANCE is 1, otherwise it must be 2^n - 1
  **/
 
 #include <stdio.h>
