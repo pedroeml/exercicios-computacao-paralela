@@ -25,6 +25,7 @@
 #define NUMBER_OF_SLAVES 5
 #define NUMBER_OF_BOOKS_BY_SLAVE 6
 #define NUMBER_OF_THREADS 8
+#define STOP_WHEN_FOUND 1
 
 MPI_Status status; // estrutura que guarda o estado de retorno
 
@@ -181,7 +182,11 @@ int find_line_in_book(Book* books, unsigned char* md5) {
         for (j = 0; j < books[i].lines_len; j++) {
             Line* line = &(books[i].lines[j]);
             if (book_number != -1) {
-                break;
+                if (STOP_WHEN_FOUND == 1) {
+                    break;
+                } else {
+                    continue;
+                }
             } else if (md5_equals(md5, line->md5)) {
                 #pragma omp atomic
                 book_number += books[i].number;
